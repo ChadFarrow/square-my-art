@@ -8,6 +8,7 @@ A one-page static web app: it turns a screenshot into a square image for Podhome
 
 - **Images never leave the browser.** The README promises it. Do not add an upload, analytics or a third-party script. The only outside request is the Google Fonts stylesheet and its fonts.
 - **The target is Podhome's chapter art rules:** JPEG or PNG, square, 1400–3000 px, sRGB, and 500 KB or less loads faster. The size buttons (1400 / 2048 / 3000), the `colorSpace: 'srgb'` canvas context and the "Keep JPEG at 500 KB or less" option exist for these rules.
+- **The target is a desktop browser.** Chad uses the app only on the desktop (2026-11-07). The iOS home-screen tags and the iPad hint in the fallback text exist, but iPad and iPhone are not targets, so do not ask for a device test. Headless Chrome covers Chrome and the other Chromium browsers. Desktop Safari is stricter about a download or a clipboard write that comes some time after the click, so a change to Save or Copy timing needs one Safari test if Safari is the browser in use.
 - **Defaults live in the `state` literal** at the top of the script. The README's "Defaults" section repeats them, so change both together.
 
 ## Commands

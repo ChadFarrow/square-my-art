@@ -176,7 +176,7 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
   const out = $('out'); let ctx = out.getContext('2d',{colorSpace:'srgb'}) || out.getContext('2d');
   const state = {img:null, name:'sample', sample:true, mode:'blur', size:3000, fmt:'png',
                  blur:6, dim:0, pad:0, shadow:false, color:'#111418', pos:50, small:false};
-  let encoded=null, encToken=0;
+  let encoded=null, encToken=0, encoding=Promise.resolve(null);
 
   // Restore light preferences
   try{ const p = JSON.parse(localStorage.getItem('square-my-art-prefs')||'{}');
@@ -229,12 +229,25 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
     return c;
   }
 
+  // Mean color along the edge of the opaque content. A window screenshot (Cmd-Shift-4, Space)
+  // has a transparent margin and a soft shadow, so the edge is found from the opaque pixels,
+  // not from the image border. Returns null for an image with no opaque pixels.
   function edgeColor(src){
-    const c=document.createElement('canvas'); c.width=c.height=16; const g=c.getContext('2d');
-    g.drawImage(src,0,0,16,16); const d=g.getImageData(0,0,16,16).data; let r=0,gg=0,b=0,n=0;
-    for(let y=0;y<16;y++)for(let x=0;x<16;x++){ if(x>0&&x<15&&y>0&&y<15)continue; const i=(y*16+x)*4; r+=d[i];gg+=d[i+1];b+=d[i+2];n++; }
+    const N=64, c=document.createElement('canvas'); c.width=c.height=N; const g=c.getContext('2d');
+    g.drawImage(src,0,0,N,N); const d=g.getImageData(0,0,N,N).data;
+    const solid=(x,y)=>d[(y*N+x)*4+3]>=230;
+    let x0=N,y0=N,x1=-1,y1=-1;
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++) if(solid(x,y)){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+    if(x1<0) return null;
+    let r=0,gg=0,b=0,n=0;
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+      if(x!==x0&&x!==x1&&y!==y0&&y!==y1) continue; if(!solid(x,y)) continue;
+      const i=(y*N+x)*4; r+=d[i];gg+=d[i+1];b+=d[i+2];n++;
+    }
     const hx=v=>Math.round(v/n).toString(16).padStart(2,'0'); return '#'+hx(r)+hx(gg)+hx(b);
   }
+  const edgeCache=new WeakMap();
+  function edgeOf(src){ if(!edgeCache.has(src)) edgeCache.set(src,edgeColor(src)); return edgeCache.get(src); }
 
   function render(){
     const S=state.size, src=state.img; if(!src) return;
@@ -242,6 +255,8 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
     ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
     ctx.clearRect(0,0,S,S);
     const w=src.naturalWidth||src.width, h=src.naturalHeight||src.height;
+    // An opaque base first, so a transparent source never gives transparent (PNG) or black (JPEG) output.
+    if(state.mode!=='color'){ ctx.fillStyle=edgeOf(src)||'#000'; ctx.fillRect(0,0,S,S); }
     if(state.mode==='crop'){
       const r=coverRect(w,h,S); const t=state.pos/100;
       const x = r[2]>S ? (S-r[2])*t : r[0], y = r[3]>S ? (S-r[3])*t : r[1];
@@ -253,11 +268,11 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
       } else { ctx.fillStyle=state.color; ctx.fillRect(0,0,S,S); }
       const off=Math.round(S*state.pad/100), box=S-off*2;
       const r=containRect(w,h,box,off);
-      if(state.shadow){
-        ctx.save(); ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=S*0.025; ctx.shadowOffsetY=S*0.008;
-        ctx.fillStyle='#000'; ctx.fillRect(r[0],r[1],r[2],r[3]); ctx.restore();
-      }
+      ctx.save();
+      // The shadow comes from the image itself, so it follows a transparent margin.
+      if(state.shadow){ ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=S*0.025; ctx.shadowOffsetY=S*0.008; }
       ctx.drawImage(src,r[0],r[1],r[2],r[3]);
+      ctx.restore();
     }
     const ratio=(w/h);
     $('meta').innerHTML =
@@ -271,25 +286,27 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
   // Encode once per change. For JPEG with the 500 KB option, use the highest quality that fits.
   const LIMIT=500*1024;
   function blobAt(type,q){ return new Promise((res,rej)=>out.toBlob(b=>b?res(b):rej(new Error('encode')),type,q)); }
-  async function encode(){
-    const tok=++encToken; encoded=null;
+  // `encoding` is the promise of the newest encode; it resolves to the blob, or null if a newer encode replaced it.
+  function encode(){ const tok=++encToken; encoded=null; encoding=encodeNow(tok); return encoding; }
+  async function encodeNow(tok){
     let blob, q=null;
     try{
       if(state.fmt==='png'){ blob=await blobAt('image/png'); }
       else if(!state.small){ q=0.95; blob=await blobAt('image/jpeg',q); }
       else {
         for(const t of [0.92,0.86,0.8,0.74,0.68,0.6,0.52,0.45]){
-          if(tok!==encToken) return;
+          if(tok!==encToken) return null;
           q=t; blob=await blobAt('image/jpeg',t); if(blob.size<=LIMIT) break;
         }
       }
-    }catch(e){ return; }
-    if(tok!==encToken) return;
+    }catch(e){ return null; }
+    if(tok!==encToken) return null;
     encoded=blob;
     const kb=Math.round(blob.size/1024), over=blob.size>LIMIT;
-    const el=$('fsize'); if(!el) return;
-    el.innerHTML=`File <b>${kb} KB</b>`+(q?` <span>q ${Math.round(q*100)}</span>`:'')+
+    const el=$('fsize');
+    if(el) el.innerHTML=`File <b>${kb} KB</b>`+(q?` <span>q ${Math.round(q*100)}</span>`:'')+
       ` <span class="chip" style="background:${over?'color-mix(in srgb,var(--accent) 30%,transparent)':'color-mix(in srgb,var(--ok) 22%,transparent)'}">${over?'Over 500 KB':'500 KB or less'}</span>`;
+    return blob;
   }
 
   // ---------- controls ----------
@@ -313,10 +330,18 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
   $('shadow').addEventListener('change',e=>{state.shadow=e.target.checked; changed();});
   $('small').addEventListener('change',e=>{state.small=e.target.checked; changed();});
   $('color').addEventListener('input',e=>{state.color=e.target.value; changed();});
-  $('pick').addEventListener('click',()=>{ if(state.img){ state.color=edgeColor(state.img); changed(); } });
+  $('pick').addEventListener('click',()=>{ const c=state.img&&edgeOf(state.img); if(c){ state.color=c; changed(); } });
 
-  let raf=0;
-  function changed(){ syncUI(); savePrefs(); cancelAnimationFrame(raf); raf=requestAnimationFrame(render); setStatus(''); }
+  let raf=0, dirty=false;
+  function changed(){ syncUI(); savePrefs(); cancelAnimationFrame(raf); dirty=true; raf=requestAnimationFrame(flush); setStatus(''); }
+  // Draw a change that still waits for its animation frame.
+  function flush(){ cancelAnimationFrame(raf); if(dirty){ dirty=false; render(); } }
+  // The file for the current settings. Waits for the encode that runs now, so Save never
+  // takes an old file or skips the 500 KB loop.
+  async function currentFile(){
+    flush();
+    for(;;){ const p=encoding, blob=await p; if(p===encoding){ if(!blob) throw new Error('encode'); return blob; } }
+  }
 
   // ---------- input ----------
   function loadFile(f){
@@ -338,12 +363,12 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
   document.addEventListener('paste',e=>{ const it=[...(e.clipboardData?.items||[])].find(x=>x.type.startsWith('image/')); if(it){ e.preventDefault(); const f=it.getAsFile(); if(f) loadFile(f);} });
 
   // ---------- output ----------
-  function toBlob(){ return new Promise((res,rej)=>out.toBlob(b=>b?res(b):rej(new Error('encode')), state.fmt==='png'?'image/png':'image/jpeg', 0.95)); }
   function setStatus(t,ok){ const s=$('status'); s.textContent=t; s.classList.toggle('ok',!!ok); }
 
   $('save').addEventListener('click',async()=>{
     try{
-      const blob=encoded||await toBlob(); const filename=`${state.name}-square-${state.size}.${state.fmt}`;
+      if(dirty||!encoded) setStatus('Preparing the file…');
+      const blob=await currentFile(); const filename=`${state.name}-square-${state.size}.${state.fmt}`;
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a'); a.href=url; a.download=filename;
       document.body.appendChild(a); a.click(); a.remove();
@@ -353,13 +378,22 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
   });
 
   $('copy').addEventListener('click',async()=>{
+    // Only a browser with no image clipboard loses the button; a refused copy can work on the next try.
+    if(!window.ClipboardItem||!navigator.clipboard?.write){
+      $('copy').disabled=true; $('fallback').hidden=false;
+      setStatus('This view blocks image copy. Use Save image, or right-click the preview.'); return;
+    }
     try{
-      if(!window.ClipboardItem||!navigator.clipboard?.write) throw 0;
-      // Clipboard images must be PNG
-      const p=new Promise((res,rej)=>out.toBlob(b=>b?res(b):rej(),'image/png'));
+      flush();
+      // Clipboard images must be PNG. The promise form keeps Safari's user gesture.
+      const p=new Promise((res,rej)=>out.toBlob(b=>b?res(b):rej(new Error('encode')),'image/png'));
       await navigator.clipboard.write([new ClipboardItem({'image/png':p})]);
       setStatus('Copied as PNG. Paste it into the Podhome upload box or Finder.',true);
-    }catch(e){ $('copy').disabled=true; $('fallback').hidden=false; setStatus('This view blocks image copy. Use Save image, or right-click the preview.'); }
+    }catch(e){
+      setStatus(e?.name==='NotAllowedError'
+        ? 'The browser did not allow the copy. Click the page, then try again, or use Save image.'
+        : 'The image was not copied. Try again, or use Save image.');
+    }
   });
 
   // ---------- boot ----------

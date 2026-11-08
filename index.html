@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Square My Art</title>
-<meta name="description" content="Make a square image from a screenshot, with a blurred, solid-color or cropped fill. Sized for Podhome chapter art.">
+<meta name="description" content="Make a square image from a screenshot or picture, with a blurred, solid-color or cropped fill. Sized for podcast chapter and episode art.">
 <meta name="theme-color" content="#14171c">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
@@ -158,7 +158,7 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
       </div>
 
       <label class="check"><input type="checkbox" id="small"> Keep JPEG at 500 KB or less</label>
-      <p class="hint">Podhome chapter art: JPEG or PNG, square, 1400–3000 px, sRGB. Files of 500 KB or less load faster.</p>
+      <p class="hint">Podcast chapter art: JPEG or PNG, square, 1400–3000 px, sRGB. Files of 500 KB or less load faster.</p>
     </section>
 
     <section class="stage" aria-label="Preview">
@@ -424,7 +424,7 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
       // Clipboard images must be PNG. The promise form keeps Safari's user gesture.
       const p=new Promise((res,rej)=>out.toBlob(b=>b?res(b):rej(new Error('encode')),'image/png'));
       await navigator.clipboard.write([new ClipboardItem({'image/png':p})]);
-      setStatus('Copied as PNG. Paste it into the Podhome upload box or Finder.',true);
+      setStatus("Copied as PNG. Paste it into your podcast host's upload box or Finder.",true);
     }catch(e){
       setStatus(e?.name==='NotAllowedError'
         ? 'The browser did not allow the copy. Click the page, then try again, or use Save image.'

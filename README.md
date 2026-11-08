@@ -1,14 +1,14 @@
 # Square My Art
 
-Make a square image from a screenshot. The empty space gets a blurred copy of the screenshot, a solid color, or the image is cropped to fill the square.
+Make a square image from a screenshot or picture. The empty space gets a blurred copy of the screenshot, a solid color, or the image is cropped to fill the square.
 
 The Screenshot size slider adds a margin around the screenshot (to the left of the middle), or zooms in on it (to the right). A zoom cuts off the long sides of the screenshot, so the empty space gets smaller; at Fill it is gone. The Crop position slider picks which part stays.
 
-Made for Podhome chapter art. All work stays in the browser. Images are not sent to a server.
+A general tool for podcast chapter and episode art. All work stays in the browser. Images are not sent to a server.
 
-## Podhome chapter art rules
+## Podcast chapter art rules
 
-- JPEG or PNG (GIF is experimental)
+- JPEG or PNG
 - Square
 - 1400 × 1400 minimum, 3000 × 3000 maximum
 - sRGB color space

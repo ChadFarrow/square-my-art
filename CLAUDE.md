@@ -42,6 +42,7 @@ All app code is in `index.html`: the CSS, the markup, then one IIFE.
 - **The mat is one flat color, not a checkerboard** (Chad's choice, 2026-11-08). A checkerboard means transparent pixels, but the output is always opaque, and the checkered mat read as part of the image being made. Only the square on the mat is the output.
 - **Input:** the file picker, a drop anywhere on the page and a paste all go through `loadFile()`.
 - **Settings persist** in localStorage key `square-my-art-prefs`: every `state` field except `img`, `name` and `sample`. A new persisted setting must also go into the key list of the restore block at the top of the script.
+- **The theme switch** (Auto / Light / Dark, top right of the header; Chad asked for it on 2026-11-08) is not a `state` field. A theme is not part of the image, so a change must not render or encode again. It has its own localStorage key, `square-my-art-theme`, which holds `light` or `dark`; Auto removes the key. Light and Dark set `data-theme` on `<html>`, which the existing `:root[data-theme]` token rules read. A small script in `<head>` applies the saved value before the first paint, so a Light choice does not flash dark on a dark system. `paintTheme()` also copies `--bg` into the `theme-color` meta tag.
 
 ## Service worker and paths
 

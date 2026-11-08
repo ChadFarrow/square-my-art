@@ -17,20 +17,22 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-/* Layout: tool bench. Left: source + settings. Right: the square proof on a checker mat. */
+/* Layout: tool bench. Left: source + settings. Right: the square proof on a plain mat.
+   The mat is one flat color, not a checkerboard: a checkerboard means "transparent pixels",
+   the output is always opaque, and a checkered mat read as part of the image being made. */
 :root{
   --bg:#eef0f3; --panel:#ffffff; --ink:#1b2029; --muted:#5d6676; --line:#d5dae2;
-  --accent:#d9661f; --accent-ink:#ffffff; --mat-a:#e3e6eb; --mat-b:#f4f5f7; --ok:#2f7d4f;
+  --accent:#d9661f; --accent-ink:#ffffff; --mat:#e3e6eb; --ok:#2f7d4f;
   --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#14171c; --panel:#1d2128; --ink:#e7eaef; --muted:#9aa3b2; --line:#2e343e;
-  --accent:#f08a45; --accent-ink:#1a1009; --mat-a:#22262d; --mat-b:#2a2f37; --ok:#5cc489; color-scheme:dark}}
+  --accent:#f08a45; --accent-ink:#1a1009; --mat:#22262d; --ok:#5cc489; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#14171c; --panel:#1d2128; --ink:#e7eaef; --muted:#9aa3b2; --line:#2e343e;
-  --accent:#f08a45; --accent-ink:#1a1009; --mat-a:#22262d; --mat-b:#2a2f37; --ok:#5cc489; color-scheme:dark}
+  --accent:#f08a45; --accent-ink:#1a1009; --mat:#22262d; --ok:#5cc489; color-scheme:dark}
 *,*::before,*::after{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--ink)}
 body{margin:0;padding-top:max(24px,env(safe-area-inset-top,0px))}
@@ -69,7 +71,7 @@ input[type=color]{width:44px;height:32px;border:1px solid var(--line);border-rad
 label.check{display:flex;gap:8px;align-items:center;cursor:pointer}
 input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
 .stage{display:grid;gap:12px;min-width:0}
-.mat{background:repeating-conic-gradient(var(--mat-a) 0 25%,var(--mat-b) 0 50%) 0 0/20px 20px;border:1px solid var(--line);border-radius:10px;padding:clamp(12px,3vw,28px);display:grid;place-items:center}
+.mat{background:var(--mat);border:1px solid var(--line);border-radius:10px;padding:clamp(12px,3vw,28px);display:grid;place-items:center}
 #out{width:100%;max-width:560px;aspect-ratio:1/1;height:auto;display:block;box-shadow:0 6px 24px rgb(0 0 0 / .18);border-radius:2px;background:var(--panel)}
 .meta{display:flex;flex-wrap:wrap;gap:6px 16px;font:400 .82rem var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
 .meta b{color:var(--ink);font-weight:500}
@@ -82,6 +84,8 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
 .status{font-size:.88rem;color:var(--muted);min-height:1.4em}
 .status.ok{color:var(--ok)}
 .hint{font-size:.85rem;color:var(--muted);margin:0;max-width:62ch}
+/* Says why most controls change nothing visible on a square or almost square image. */
+.note{font-size:.85rem;margin:0;padding:8px 10px;border-left:3px solid var(--accent);border-radius:0 6px 6px 0;background:color-mix(in srgb,var(--accent) 9%,transparent)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -109,6 +113,8 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
           <button type="button" data-v="crop" aria-pressed="false">Crop</button>
         </div>
       </div>
+
+      <p class="note" id="squareNote" hidden></p>
 
       <div class="field" id="blurField">
         <div class="label"><span>Blur strength</span><output id="blurOut"></output></div>
@@ -344,6 +350,9 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
   }
 
   // ---------- controls ----------
+  // A long side up to 3 % longer than the short side counts as almost square: at Fit the fill is then
+  // a band of 1.5 % or less on each side, about 8 px in the preview.
+  const NEAR_SQUARE=1.03;
   function syncUI(){
     for(const [id,key] of [['mode','mode'],['size','size'],['fmt','fmt']])
       $(id).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.v==String(state[key]))));
@@ -353,6 +362,15 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
     // "Center" only at the exact middle; otherwise the direction and the distance from the middle.
     const im=state.img, wide=!im || (im.naturalWidth||im.width) >= (im.naturalHeight||im.height), away=Math.abs(state.pos-50)*2;
     $('posOut').textContent = away===0 ? 'Center' : `${state.pos<50 ? (wide?'Left':'Top') : (wide?'Right':'Bottom')} ${away} %`;
+    // A square or almost square image already fills the square, so Blur, Darken, Color, Crop position,
+    // the shadow and the zoom change only a thin edge or nothing. Say so, and say what does work.
+    // It depends on the image and the mode only, never on a slider, so it cannot come and go during a drag.
+    const iw=im&&(im.naturalWidth||im.width), ih=im&&(im.naturalHeight||im.height);
+    const shape = im && Math.max(iw,ih)/Math.min(iw,ih) <= NEAR_SQUARE ? (iw===ih ? 'square' : 'almost square') : '';
+    $('squareNote').hidden = !shape;
+    if(shape) $('squareNote').textContent = state.mode==='crop'
+      ? `This image is ${shape}, so Crop has ${iw===ih?'nothing':'almost nothing'} to cut. To add a border, choose Blur or Color and move Screenshot size to the left of Fit.`
+      : `This image is ${shape}. The fill shows only in a border: move Screenshot size to the left of Fit to add one.`;
     $('blurField').hidden = $('dimField').hidden = state.mode!=='blur';
     $('colorField').hidden = state.mode!=='color';
     $('fitField').hidden = $('shadowField').hidden = state.mode==='crop';

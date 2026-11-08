@@ -25,7 +25,7 @@ Use `localhost` or https: the service worker does not register from `file://`.
 
 Vercel project `square-my-art` (team `chadfs-projects`), linked to this GitHub repo. A push to `main` deploys production at https://square-my-art.vercel.app. The project uses the "Other" framework preset, no build command, and the repo root as output.
 
-A branch push makes a preview deployment, but Vercel deployment protection covers every domain except `square-my-art.vercel.app`. A preview or deployment URL answers 302 to a Vercel login, so curl and headless Chrome cannot open it. Test locally.
+A branch push makes a preview deployment at `https://square-my-art-git-<branch>-chadfs-projects.vercel.app`; the Vercel bot links it on the PR. Vercel Authentication (deployment protection) is off for this project since 2026-11-08 (Chad's choice), so every preview and deployment URL is public and curl and headless Chrome can open it. Test a PR on its preview, as well as locally. Nothing in the app is secret: it has no server code, and images never leave the browser. Before that date, a preview answered 302 to a Vercel login.
 
 ## Architecture
 
@@ -38,6 +38,8 @@ All app code is in `index.html`: the CSS, the markup, then one IIFE.
 - **`encode()` runs after each render.** It keeps the promise of the newest encode in `encoding` and the finished blob in `encoded`. `encToken` discards the result of an encode that a newer one replaced. For JPEG with the 500 KB option, it tries quality 0.92 down to 0.45 and keeps the first blob of 500 KB or less, or the 0.45 blob if none fits (the chip then says "Over 500 KB"). The meta line's "File … KB" item shows `…` until the encode finishes.
 - **Save** gets its file from `currentFile()`. That calls `flush()`, which draws a change that still waits for its animation frame, then waits for the newest `encoding`. So the file always matches the screen and the 500 KB option. Do not give Save its own encode again: that is how it once saved a 1.7 MB JPEG while the app said "500 KB or less". The file name is `<name>-square-<size>.<jpg|png>`.
 - **Copy** always writes a PNG through `ClipboardItem` with a promise, which is the form Safari needs. Only a browser with no image clipboard disables the button. A refused copy (for example, the window lost focus) leaves it enabled.
+- **The square note.** A square or almost square image fills the square, so Blur, Darken, Color, Crop position, the shadow and the zoom change only a thin edge or nothing. On 2026-11-08 Chad read that as broken controls (a 945 × 937 source). So `syncUI()` shows `#squareNote` when the long side is at most `NEAR_SQUARE` (1.03) times the short side, and says to move Screenshot size to the left of Fit. The note depends on the image and the mode only, never on a slider, so it cannot come and go during a drag.
+- **The mat is one flat color, not a checkerboard** (Chad's choice, 2026-11-08). A checkerboard means transparent pixels, but the output is always opaque, and the checkered mat read as part of the image being made. Only the square on the mat is the output.
 - **Input:** the file picker, a drop anywhere on the page and a paste all go through `loadFile()`.
 - **Settings persist** in localStorage key `square-my-art-prefs`: every `state` field except `img`, `name` and `sample`. A new persisted setting must also go into the key list of the restore block at the top of the script.
 

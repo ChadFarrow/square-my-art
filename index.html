@@ -124,9 +124,9 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
         </div>
       </div>
 
-      <div class="field" id="padField">
-        <div class="label"><span>Margin around screenshot</span><output id="padOut"></output></div>
-        <input type="range" id="pad" min="0" max="20" step="1" value="0">
+      <div class="field" id="fitField">
+        <div class="label"><span>Screenshot size</span><output id="fitOut"></output></div>
+        <input type="range" id="fit" min="-100" max="100" step="5" value="0" aria-label="Screenshot size: margin to the left, zoom to the right">
       </div>
 
       <div class="field" id="posField" hidden>
@@ -175,12 +175,15 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
   const $ = id => document.getElementById(id);
   const out = $('out'); let ctx = out.getContext('2d',{colorSpace:'srgb'}) || out.getContext('2d');
   const state = {img:null, name:'sample', sample:true, mode:'blur', size:3000, fmt:'png',
-                 blur:6, dim:0, pad:0, shadow:false, color:'#111418', pos:50, small:false};
+                 blur:6, dim:0, fit:0, shadow:false, color:'#111418', pos:50, small:false};
   let encoded=null, encToken=0, encoding=Promise.resolve(null);
 
   // Restore light preferences
   try{ const p = JSON.parse(localStorage.getItem('square-my-art-prefs')||'{}');
-       for(const k of ['mode','size','fmt','blur','dim','pad','shadow','color','pos','small']) if(k in p) state[k]=p[k];
+       for(const k of ['mode','size','fmt','blur','dim','fit','shadow','color','pos','small']) if(k in p) state[k]=p[k];
+       // Before the zoom, the slider was `pad`: a margin of 0-20 %.
+       if(!('fit' in p) && 'pad' in p) state.fit=-Number(p.pad)*5;
+       state.fit=Math.max(-100,Math.min(100,Math.round(Number(state.fit)/5)*5))||0;
        if(!['jpg','png'].includes(state.fmt)) state.fmt='jpg'; }catch(e){}
   function savePrefs(){ try{ const {img,name,sample,...p}=state; localStorage.setItem('square-my-art-prefs',JSON.stringify(p)); }catch(e){} }
 
@@ -266,8 +269,15 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
         ctx.drawImage(blurredCover(src,S,state.blur),0,0,S,S);
         if(state.dim>0){ ctx.fillStyle=`rgba(0,0,0,${state.dim/100})`; ctx.fillRect(0,0,S,S); }
       } else { ctx.fillStyle=state.color; ctx.fillRect(0,0,S,S); }
-      const off=Math.round(S*state.pad/100), box=S-off*2;
+      // Screenshot size: left of the middle is a margin (up to 20 %); right of it is a zoom that
+      // ends where the image fills the square. A zoom cuts the long sides; `pos` picks the part that stays.
+      const margin=state.fit<0 ? -state.fit/5 : 0, zoom=state.fit>0 ? state.fit/100 : 0;
+      const off=Math.round(S*margin/100), box=S-off*2;
       const r=containRect(w,h,box,off);
+      if(zoom>0){
+        const k=1+zoom*(Math.max(w,h)/Math.min(w,h)-1), t=state.pos/100, dw=r[2]*k, dh=r[3]*k;
+        r[0] = dw>S ? (S-dw)*t : (S-dw)/2; r[1] = dh>S ? (S-dh)*t : (S-dh)/2; r[2]=dw; r[3]=dh;
+      }
       ctx.save();
       // The shadow comes from the image itself, so it follows a transparent margin.
       if(state.shadow){ ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=S*0.025; ctx.shadowOffsetY=S*0.008; }
@@ -313,20 +323,21 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
   function syncUI(){
     for(const [id,key] of [['mode','mode'],['size','size'],['fmt','fmt']])
       $(id).querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.v==String(state[key]))));
-    $('blur').value=state.blur; $('dim').value=state.dim; $('pad').value=state.pad; $('shadow').checked=state.shadow; $('small').checked=state.small; $('small').disabled=state.fmt!=='jpg'; $('color').value=state.color;
-    $('blurOut').textContent=state.blur+' / 10'; $('dimOut').textContent=state.dim+' %'; $('padOut').textContent=state.pad+' %'; $('pos').value=state.pos;
+    $('blur').value=state.blur; $('dim').value=state.dim; $('fit').value=state.fit; $('shadow').checked=state.shadow; $('small').checked=state.small; $('small').disabled=state.fmt!=='jpg'; $('color').value=state.color;
+    $('blurOut').textContent=state.blur+' / 10'; $('dimOut').textContent=state.dim+' %'; $('pos').value=state.pos;
+    $('fitOut').textContent = state.fit<0 ? `Margin ${-state.fit/5} %` : state.fit===0 ? 'Fit' : state.fit>=100 ? 'Fill' : `Zoom ${state.fit} %`;
     $('posOut').textContent = state.pos<34?'Left / top':state.pos>66?'Right / bottom':'Center';
-    $('posField').hidden = state.mode!=='crop';
+    $('posField').hidden = !(state.mode==='crop' || state.fit>0);
     $('blurField').hidden = $('dimField').hidden = state.mode!=='blur';
     $('colorField').hidden = state.mode!=='color';
-    $('padField').hidden = $('shadowField').hidden = state.mode==='crop';
+    $('fitField').hidden = $('shadowField').hidden = state.mode==='crop';
   }
   function seg(id,key,num){
     $(id).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
       state[key]=num?Number(b.dataset.v):b.dataset.v; changed(); });
   }
   seg('mode','mode'); seg('size','size',true); seg('fmt','fmt');
-  for(const k of ['blur','dim','pad','pos']) $(k).addEventListener('input',e=>{state[k]=Number(e.target.value); changed();});
+  for(const k of ['blur','dim','fit','pos']) $(k).addEventListener('input',e=>{state[k]=Number(e.target.value); changed();});
   $('shadow').addEventListener('change',e=>{state.shadow=e.target.checked; changed();});
   $('small').addEventListener('change',e=>{state.small=e.target.checked; changed();});
   $('color').addEventListener('input',e=>{state.color=e.target.value; changed();});

@@ -133,7 +133,7 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
         <div class="ticked"><input type="range" id="fit" min="-100" max="100" step="5" value="0" aria-label="Screenshot size: margin to the left, zoom to the right"><span class="tick" aria-hidden="true"></span></div>
       </div>
 
-      <div class="field" id="posField" hidden>
+      <div class="field" id="posField">
         <div class="label"><span>Crop position</span><output id="posOut"></output></div>
         <div class="ticked"><input type="range" id="pos" min="0" max="100" step="5" value="50"><span class="tick" aria-hidden="true"></span></div>
       </div>
@@ -335,7 +335,6 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
     // "Center" only at the exact middle; otherwise the direction and the distance from the middle.
     const im=state.img, wide=!im || (im.naturalWidth||im.width) >= (im.naturalHeight||im.height), away=Math.abs(state.pos-50)*2;
     $('posOut').textContent = away===0 ? 'Center' : `${state.pos<50 ? (wide?'Left':'Top') : (wide?'Right':'Bottom')} ${away} %`;
-    $('posField').hidden = !(state.mode==='crop' || state.fit>0);
     $('blurField').hidden = $('dimField').hidden = state.mode!=='blur';
     $('colorField').hidden = state.mode!=='color';
     $('fitField').hidden = $('shadowField').hidden = state.mode==='crop';

@@ -25,7 +25,7 @@ Use `localhost` or https: the service worker does not register from `file://`.
 
 Vercel project `square-my-art` (team `chadfs-projects`), linked to this GitHub repo. A push to `main` deploys production at https://square-my-art.vercel.app. The project uses the "Other" framework preset, no build command, and the repo root as output.
 
-A branch push makes a preview deployment, but Vercel deployment protection covers every domain except `square-my-art.vercel.app`. A preview or deployment URL answers 302 to a Vercel login, so curl and headless Chrome cannot open it. Test locally.
+A branch push makes a preview deployment at `https://square-my-art-git-<branch>-chadfs-projects.vercel.app`; the Vercel bot links it on the PR. Vercel Authentication (deployment protection) is off for this project since 2026-11-08 (Chad's choice), so every preview and deployment URL is public and curl and headless Chrome can open it. Test a PR on its preview, as well as locally. Nothing in the app is secret: it has no server code, and images never leave the browser. Before that date, a preview answered 302 to a Vercel login.
 
 ## Architecture
 

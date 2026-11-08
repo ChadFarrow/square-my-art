@@ -1,5 +1,5 @@
 // Offline cache for Square My Art. Change VERSION to make clients take new files.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const FILES = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/icon-192.png', '/apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

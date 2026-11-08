@@ -60,6 +60,10 @@ kbd{font:500 .8em var(--mono);border:1px solid var(--line);border-radius:4px;pad
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
 .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 input[type=range]{width:100%;accent-color:var(--accent)}
+/* A mark under the middle of a slider whose middle means something (Fit, Center). */
+.ticked{position:relative;padding-bottom:7px}
+.ticked input{display:block;margin:0}
+.tick{position:absolute;left:50%;bottom:0;width:2px;height:6px;margin-left:-1px;border-radius:1px;background:var(--muted);pointer-events:none}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 input[type=color]{width:44px;height:32px;border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:2px}
 label.check{display:flex;gap:8px;align-items:center;cursor:pointer}
@@ -126,12 +130,12 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
 
       <div class="field" id="fitField">
         <div class="label"><span>Screenshot size</span><output id="fitOut"></output></div>
-        <input type="range" id="fit" min="-100" max="100" step="5" value="0" aria-label="Screenshot size: margin to the left, zoom to the right">
+        <div class="ticked"><input type="range" id="fit" min="-100" max="100" step="5" value="0" aria-label="Screenshot size: margin to the left, zoom to the right"><span class="tick" aria-hidden="true"></span></div>
       </div>
 
       <div class="field" id="posField" hidden>
         <div class="label"><span>Crop position</span><output id="posOut"></output></div>
-        <input type="range" id="pos" min="0" max="100" step="1" value="50">
+        <div class="ticked"><input type="range" id="pos" min="0" max="100" step="5" value="50"><span class="tick" aria-hidden="true"></span></div>
       </div>
 
       <label class="check" id="shadowField"><input type="checkbox" id="shadow"> Drop shadow under screenshot</label>
@@ -184,6 +188,8 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
        // Before the zoom, the slider was `pad`: a margin of 0-20 %.
        if(!('fit' in p) && 'pad' in p) state.fit=-Number(p.pad)*5;
        state.fit=Math.max(-100,Math.min(100,Math.round(Number(state.fit)/5)*5))||0;
+       // Crop position moves in steps of 5; an older saved value rounds to the nearest step.
+       const pz=Math.round(Number(state.pos)/5)*5; state.pos=Number.isFinite(pz)?Math.max(0,Math.min(100,pz)):50;
        if(!['jpg','png'].includes(state.fmt)) state.fmt='jpg'; }catch(e){}
   function savePrefs(){ try{ const {img,name,sample,...p}=state; localStorage.setItem('square-my-art-prefs',JSON.stringify(p)); }catch(e){} }
 
@@ -326,7 +332,9 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
     $('blur').value=state.blur; $('dim').value=state.dim; $('fit').value=state.fit; $('shadow').checked=state.shadow; $('small').checked=state.small; $('small').disabled=state.fmt!=='jpg'; $('color').value=state.color;
     $('blurOut').textContent=state.blur+' / 10'; $('dimOut').textContent=state.dim+' %'; $('pos').value=state.pos;
     $('fitOut').textContent = state.fit<0 ? `Margin ${-state.fit/5} %` : state.fit===0 ? 'Fit' : state.fit>=100 ? 'Fill' : `Zoom ${state.fit} %`;
-    $('posOut').textContent = state.pos<34?'Left / top':state.pos>66?'Right / bottom':'Center';
+    // "Center" only at the exact middle; otherwise the direction and the distance from the middle.
+    const im=state.img, wide=!im || (im.naturalWidth||im.width) >= (im.naturalHeight||im.height), away=Math.abs(state.pos-50)*2;
+    $('posOut').textContent = away===0 ? 'Center' : `${state.pos<50 ? (wide?'Left':'Top') : (wide?'Right':'Bottom')} ${away} %`;
     $('posField').hidden = !(state.mode==='crop' || state.fit>0);
     $('blurField').hidden = $('dimField').hidden = state.mode!=='blur';
     $('colorField').hidden = state.mode!=='color';

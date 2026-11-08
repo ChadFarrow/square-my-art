@@ -20,8 +20,9 @@ A general tool for podcast chapter and episode art. All work stays in the browse
 - Screenshot size: Fit (no margin, no zoom)
 - Size: 3000 × 3000
 - Format: PNG (lossless). For JPEG, quality is 95. "Keep JPEG at 500 KB or less" is off.
+- Theme: Auto, which follows the system setting. The switch at the top right sets Light or Dark.
 
-The app remembers your last settings in the browser.
+The app remembers your last settings and your theme in the browser.
 
 ## Input
 

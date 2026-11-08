@@ -1,7 +1,7 @@
 {
   "name": "Square My Art",
   "short_name": "Square Art",
-  "description": "Make a square image from a screenshot. Sized for Podhome chapter art.",
+  "description": "Make a square image from a screenshot or picture. Sized for podcast chapter and episode art.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
